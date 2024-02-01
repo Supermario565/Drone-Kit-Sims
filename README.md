@@ -41,7 +41,8 @@ Currently the following sims are tested and known to work as is:
 * Set Altitude Target
 * MicroGCS
 * Guided Set Speed Yaw
-* 
+* Performance Test
+* Play tune
 
 ### Sample goto Simulation
 ```
