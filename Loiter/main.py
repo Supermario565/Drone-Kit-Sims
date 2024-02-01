@@ -2,8 +2,7 @@
 Author: Dmitri Lyalikov
 
 This script connects to the Copter and polls for armability and armed status.
-Run this simulation in PC Docker Environment. as python main.py
-Careful, we are using python 2.7 here.
+We then launch the vehicle and command it to loiter at a specific location. 
 
 """
 
@@ -18,7 +17,7 @@ parser.add_argument('--connect',
 
 args = parser.parse_args()
 connection_string = args.connect
-sitl = None 
+sitl = None
 
 # Start SITL if no connection string specified
 if not connection_string:
@@ -68,36 +67,21 @@ def arm_and_takeoff(aTargetAltitude):
 arm_and_takeoff(10)
 
 print("Set default/target airspeed to 3")
-# Airspeed in meters/second
 vehicle.airspeed = 3
 
-print("Going towards first point for 30 seconds ...")
-point1 = LocationGlobalRelative(47.397742, 8.545594, 10)
+print("Going to first point for 30 seconds ...")
+point1 = LocationGlobalRelative(37.8736, -122.254, 10)
 vehicle.simple_goto(point1)
 
 # sleep so we can see the change in map
 time.sleep(30)
 
-print("Going towards second point for 30 seconds (groundspeed set to 10 m/s) ...")
-# Global location object: altitude relative to home location altitude
-# Relative to WGS84, latitude, longitude, and altitude in meters
-point2 = LocationGlobalRelative(47.397742, 8.545594, 10)
-
-vehicle.simple_goto(point2, groundspeed=10)
-
-# sleep so we can see the change in map
+# Loiter at the current location for 30 seconds
+print("Loitering for 30 seconds ...")
 time.sleep(30)
 
-print("Returning to Launch")  
-"""
-RTL Mode navigates the vehicle from its current position to hover above the home position.
-The behavior of the mode is determined by the vehicle's home_location and the RTL_ALT parameter.
-
-THe copter will rise a minimum of RLT_CLIMB_MIN meters or to RTL_ALT, whichever is higher, before returning home.
-The default value for for RTL_ALT is 15 meters.
-
-This means if you execute an RTL in Copter, it will return to the location where it was armed.
-""" 
+# Return to launch
+print("Returning to Launch")
 vehicle.mode = VehicleMode("RTL")
 
 # Close vehicle object before exiting script
