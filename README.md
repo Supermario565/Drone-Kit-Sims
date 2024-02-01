@@ -14,11 +14,21 @@ cd /home
 ```
 To run a SITL example simulation: 
 ```
-git clone https://github.com/dronekit/dronekit-sitl.git
+git clone https://github.com/dronekit/dronekit-python.git
 cd dronekit-python/examples
 cd /<some_example>
 python <example_proj>.py
 ```
+Currently the following sims are known to work as is:
+* Channel Overrides
+* Create Attribute
+* Flight Replay
+* Vehicle State
+* Simple GoTo
+* Set Altitude Target
+* MicroGCS
+* Guided Set Speed Yaw
+* 
 
 ### Sample goto Simulation
 ```
