@@ -1,6 +1,9 @@
 # Drone-Kit-Sims
 Collection of our Drone-Kit Simulations for Experimentation
 
+![Drawing28](https://github.com/riverdale-soc/Drone-Kit-Sims/assets/68623356/7b2efde7-bd80-4165-b210-0e06a71d729a)
+
+
 ## To Run
 on Dmitri Lab PC:
 Start Docker container holding DroneKit SITL (https://github.com/dronekit/dronekit-sitl.git) Framework. 
