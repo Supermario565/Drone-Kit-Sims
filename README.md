@@ -19,7 +19,7 @@ cd dronekit-python/examples
 cd /<some_example>
 python <example_proj>.py
 ```
-Currently the following sims are known to work as is:
+Currently the following sims are tested and known to work as is:
 * Channel Overrides
 * Create Attribute
 * Flight Replay
