@@ -12,4 +12,11 @@ Change to Home directory
 ```
 cd /home
 ```
+To run a SITL example simulation: 
+```
+git clone https://github.com/dronekit/dronekit-sitl.git
+cd dronekit-python/examples
+cd /<some_example>
+python <example_proj>.py
+```
 
