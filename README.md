@@ -41,8 +41,9 @@ Currently the following sims are tested and known to work as is:
 * Set Altitude Target
 * MicroGCS
 * Guided Set Speed Yaw
+* Mission Basic
+* Mission Import Export
 * Performance Test
-* Play tune
 
 ### Sample goto Simulation
 ```
