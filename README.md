@@ -2,7 +2,7 @@
 Collection of our Drone-Kit Simulations for Experimentation
 
 Based on UAV-MOBFinder Project, we need to simulate the following processes individually, then integrate them as a project:
-* Connect and wait for Arming
+* [ ] Connect and wait for Arming
 * Begin Guided Launch to a given altitude
 * GoTo GPS based on Submersion Module location
 * Load Start Auto Mission
