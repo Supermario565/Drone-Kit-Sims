@@ -1,6 +1,16 @@
 # Drone-Kit-Sims
 Collection of our Drone-Kit Simulations for Experimentation
 
+Based on UAV-MOBFinder Project, we need to simulate the following processes individually, then integrate them as a project:
+* Connect and wait for Arming
+* Begin Guided Launch to a given altitude
+* GoTo GPS based on Submersion Module location
+* Load Start Auto Mission
+* Simulate YOLO Inference/GPS Approximation Guidance
+* Send MOB/Drone Coordinates to GCS
+* Loiter at Altitude
+* Land at Home Base
+
 ![Drawing28](https://github.com/riverdale-soc/Drone-Kit-Sims/assets/68623356/7b2efde7-bd80-4165-b210-0e06a71d729a)
 
 
