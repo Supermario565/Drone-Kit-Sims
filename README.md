@@ -25,6 +25,14 @@ Change to Home directory
 ```
 cd /home
 ```
+To run a sub module in this project:
+```
+git clone https://github.com/riverdale-soc/Drone-Kit-Sims.git
+cd Drone-Kit-Sims
+cd <a simulation of choice>
+python <the python simulation of choice>
+```
+
 To run a SITL example simulation: 
 ```
 git clone https://github.com/dronekit/dronekit-python.git
