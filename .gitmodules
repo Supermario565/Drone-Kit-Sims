@@ -1,0 +1,3 @@
+[submodule "YOLO Navigation/MOBDrone-YOLOv7"]
+	path = YOLO Navigation/MOBDrone-YOLOv7
+	url = https://github.com/DmitriLyalikov/MOBDrone-YOLOv7.git
