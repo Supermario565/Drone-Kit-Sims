@@ -1,13 +1,26 @@
 
 
-#Creating a pre-programmed mission
-
+#Creating a pre-programmed circle mission
 
 from __future__ import print_function
+import math
 import time
 from dronekit import connect, VehicleMode, LocationGlobalRelative
 
 import argparse
+
+def download_missions():
+    """
+    Download missions from the vehicle.
+    """
+    print("Downloading missions...")
+    missions = vehicle.commands
+    missions.download()
+    missions.wait_ready()
+    print("Missions downloaded successfully.")
+
+download_missions()
+
 parser = argparse.ArgumentParser(description='Commands vehicle using vehicle.simple_goto.')
 parser.add_argument('--connect', 
                      help="Vehicle connection target string. If not specified, SITL automatically started and used.")
@@ -19,6 +32,8 @@ sitl = None
 # Start SITL if no connection string specified
 if not connection_string:
     import dronekit_sitl
+    print("Starting copter simulator (SITL)")
+
     sitl = dronekit_sitl.start_default()
     connection_string = sitl.connection_string()
 
@@ -66,17 +81,38 @@ arm_and_takeoff(10)
 print("Set default/target airspeed to 3")
 vehicle.airspeed = 3
 
+
 #Sending Drone to a location
-print("Going to first point for 30 seconds ...")
-point1 = LocationGlobalRelative(37.8736, -122.254, 10)
-vehicle.simple_goto(point1)
+# Define the center of the circle
+center_lat = 37.8736
+center_lon = -122.254
 
-# sleep so we can see the change in map
-time.sleep(30)
+# Define the radius of the circle
+radius = 10  # in meters
 
-# Loiter at the current location for 30 seconds
-print("Loitering for 30 seconds ...")
-time.sleep(30)
+# Define the duration of the circle flight
+circle_duration = 180  # in seconds
+
+# Calculate the number of waypoints to create a circle
+num_waypoints = int(circle_duration / 2)  # Assuming 2 seconds per waypoint
+
+# Calculate the angle between each waypoint
+angle_increment = 2 * math.pi / num_waypoints
+
+# Start the circle flight
+print("Starting circle flight ...")
+for i in range(num_waypoints):
+    # Calculate the coordinates of the current waypoint on the circle
+    angle = i * angle_increment
+    waypoint_lat = center_lat + radius * math.cos(angle)
+    waypoint_lon = center_lon + radius * math.sin(angle)
+    waypoint = LocationGlobalRelative(waypoint_lat, waypoint_lon, 10)
+    
+    # Go to the current waypoint
+    vehicle.simple_goto(waypoint)
+    
+    # Sleep for 2 seconds before going to the next waypoint
+    time.sleep(2)
 
 # Return to launch
 print("Returning to Launch")
@@ -91,3 +127,4 @@ if sitl:
     sitl.stop()
 
 print("Completed")
+
