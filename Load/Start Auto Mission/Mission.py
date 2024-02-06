@@ -11,14 +11,15 @@ from functools import lru_cache
 from heapq import heappush, heappop
 from dronekit import LocationGlobal
 import math
+import numpy as np
 
 
 @dataclass
 class Waypoint:
-    u: int
-    v: int
-    point: LocationGlobal
-    weight: int = 1
+    u: int # index of starting state
+    v: int # index of ending state
+    point: LocationGlobal # GPS coordinates of the waypoint
+    weight: int = 1 # Unit time to travel from u to v in seconds 
 
     def reversed(self):
         return Waypoint(self.v, self.u, self.weight)
@@ -112,7 +113,7 @@ class Mission:
                     pq.push(DijkstraNode(we.v, we.weight + dist_u))
         return distances, path_dict
 
-    def build_mission(self, home_lat: int = 120.1, home_long: int = 35.5, TargetAltitude: int =20, Area: int =160000, Cam_FOV: int =160):
+    def build_mission(self, home_lat: int = 120.1, home_long: int = 35.5, TargetAltitude: int =20, Area: int =16000, Cam_FOV: int =160, MAX_RANGE=250):
         # We need to build a Mission with least waypoints holding GPS coordinates for each waypoint. 
         # Starting at home location, build LocationGlobal waypoints for each state in the mission plan
         # Allow for all area to be covered by the camera at a given altitude. 
@@ -122,63 +123,77 @@ class Mission:
 
         # Calculate area of 0 altitude image captured by camera at given altitude in square meters using camera FOV in degrees and altitude in meters
         camera_area = (math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)**2
+
+        # width of the grid area to be covered by the camera in meters
+        H = math.sqrt(Area)
+        # How many waypoints to cover this width 
+        waypoint_width = int(H / camera_area) + 1
+        # Make sure waypoint_width is odd, so center home location is in the middle of the grid
+        if waypoint_width % 2 == 0:
+            waypoint_width += 1
         
-        
-        num_waypoints = Area // camera_area
-        # calculate distance between waypoints
-        distance = math.sqrt(camera_area)
-        # calculate number of rows needed to cover the area
-        num_rows = math.sqrt(num_waypoints)
-        # calculate number of columns needed to cover the area
-        num_columns = num_waypoints // num_rows
-        # calculate distance between rows
-        row_distance = distance
-        # calculate distance between columns
-        column_distance = distance
+        # Furthest distance from the origin
+        reach = H // 2 
+        if reach > MAX_RANGE:
+            reach = MAX_RANGE
+        reach = int(reach)
+
+        start = LocationGlobal(home_lat, home_long, TargetAltitude)
+        # Create np Grid matrix of waypoints
+        # Create waypoint_witdth x waypoint_width grid of waypoints. Home coordinates will be in the middle of the grid. (0, 0)
+        # Expand grid from center in all four quadrants. 
+        # If Reach = 1: Matrix looks like
+        #    (-1, 1), (0, 1), (1, 1)
+        #    (-1, 0), (0, 0), (1, 0)
+        #    (-1, -1), (0, -1), (1, -1)
+
+        # If Reach = 2: Matrix looks like:
+        #   (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2)
+        #   (-2, 1), (-1, 1), (0, 1), (1, 1), (2, 1)
+        #   (-2, 0), (-1, 0), (0, 0), (1, 0), (2, 0)
+        #   (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1)
+        #   (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2)
+        #         
+        # Create matrix based on reach
+        # Create 2D matrix 
+        transform = np.zeros((reach * 2 + 1, reach * 2 + 1), dtype=object)
+        for y in range(-reach, reach + 1):
+            # Iterate in reverse direction as done for x
+            for x in range(-reach, reach + 1):
+                transform[x + reach, y + reach] = (x, -y)
+
+
+
+        # Iterate through transfrom and create waypoints where:
+        # Longitude = home_long + x * waypoint_width
+        # Latitude = home_lat + y * waypoint_width
+        for y in range(-reach, reach + 1):
+            for x in range(-reach, reach + 1):
+                # Calculate the GPS coordinates of the waypoint
+                # Longitude = home_long + x * waypoint_width
+                # Latitude = home_lat + y * waypoint_width
+                # Create waypoint at the calculated GPS coordinates
+                # Add waypoint to the mission plan
+                self.add_waypoint(Waypoint(0, 0, LocationGlobal(home_lat + y * waypoint_width, home_long + x * waypoint_width, TargetAltitude)))
+
+
+
         # calculate starting point for the mission
         start = LocationGlobal(home_lat, home_long, TargetAltitude)
         # calculate ending point for the mission
         end = LocationGlobal(home_lat, home_long, TargetAltitude)
 
-        # create GPS coordinates for each waypoint in the mission plan in a grid, 
-        # Start at home location and move to the right, then move up, then move to the left, then move back dwon, and so on.
-        # Assuming camera is facing down and home location is starting point directly in middle of grid
-        # until the entire area is covered
-        """
-        Grid will look like this: where H is home location and firt waypoint is the top left corner of the grid
-        * * * * * * * * * 
-        * * * * * * * * * 
-        * * * * * * * * * 
-        * * * * * * * * *
-        * * * * h * * * *
-        * * * * * * * * *
-        * * * * * * * * *
-        * * * * * * * * *
-        * * * * * * * * *
-        """
-        # create first waypoint at top left corner of the grid
-        first = LocationGlobal(home_lat - (num_rows/2 * row_distance), home_long - (num_columns/2 * column_distance), TargetAltitude)
-        # create last waypoint at bottom right corner of the grid
-        last = LocationGlobal(home_lat + (num_rows/2 * row_distance), home_long + (num_columns/2 * column_distance), TargetAltitude)
-        # create Waypoint objects for each waypoint in the mission plan
-        # Make four quadrants of the grid, starting from the top left corner and moving to the right, then down, then left, then up
-        # until the entire area is covered
-        # Quadrant 1
-        for i in range(num_rows//2):
-            for j in range(num_columns//2):
-                self.add_waypoint(Waypoint(first, LocationGlobal(first.lat + i * row_distance, first.lon + j * column_distance, TargetAltitude)))
-        # Quadrant 2
-        for i in range(num_rows//2):
-            for j in range(num_columns//2):
-                self.add_waypoint(Waypoint(first, LocationGlobal(first.lat + i * row_distance, first.lon - j * column_distance, TargetAltitude)))
-        # Quadrant 3
-        for i in range(num_rows//2):
-            for j in range(num_columns//2):
-                self.add_waypoint(Waypoint(first, LocationGlobal(first.lat - i * row_distance, first.lon - j * column_distance, TargetAltitude)))
-        # Quadrant 4
-        for i in range(num_rows//2):
-            for j in range(num_columns//2):
-                self.add_waypoint(Waypoint(first, LocationGlobal(first.lat - i * row_distance, first.lon + j * column_distance, TargetAltitude)))
+# Function that returns new GPS coordinates when adding some meters to longitude and latitude
+def new_gps_coords(lat, lon, dNorth, dEast):
+    earth_radius = 6378137.0
+    # Coordinate offsets in radians
+    dLat = dNorth/earth_radius
+    dLon = dEast/(earth_radius*math.cos(math.pi*lat/180))
+
+    # New coordinates in degrees
+    newlat = lat + dLat * 180/math.pi
+    newlon = lon + dLon * 180/math.pi
+    return LocationGlobal(newlat, newlon, 0)
 
 
 @dataclass
