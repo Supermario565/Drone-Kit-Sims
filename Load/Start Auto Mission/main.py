@@ -9,18 +9,6 @@ from dronekit import connect, VehicleMode, LocationGlobalRelative
 
 import argparse
 
-def download_missions():
-    """
-    Download missions from the vehicle.
-    """
-    print("Downloading missions...")
-    missions = vehicle.commands
-    missions.download()
-    missions.wait_ready()
-    print("Missions downloaded successfully.")
-
-download_missions()
-
 parser = argparse.ArgumentParser(description='Commands vehicle using vehicle.simple_goto.')
 parser.add_argument('--connect', 
                      help="Vehicle connection target string. If not specified, SITL automatically started and used.")
@@ -32,6 +20,8 @@ sitl = None
 # Start SITL if no connection string specified
 if not connection_string:
     import dronekit_sitl
+
+import requests
     print("Starting copter simulator (SITL)")
 
     sitl = dronekit_sitl.start_default()
@@ -91,7 +81,7 @@ center_lon = -122.254
 radius = 10  # in meters
 
 # Define the duration of the circle flight
-circle_duration = 180  # in seconds
+circle_duration = 60  # in seconds
 
 # Calculate the number of waypoints to create a circle
 num_waypoints = int(circle_duration / 2)  # Assuming 2 seconds per waypoint
@@ -110,6 +100,7 @@ for i in range(num_waypoints):
     
     # Go to the current waypoint
     vehicle.simple_goto(waypoint)
+    print(vehicle.location.global_frame)
     
     # Sleep for 2 seconds before going to the next waypoint
     time.sleep(2)
@@ -127,4 +118,6 @@ if sitl:
     sitl.stop()
 
 print("Completed")
+
+
 
