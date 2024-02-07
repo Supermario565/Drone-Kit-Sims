@@ -162,26 +162,26 @@ class Mission:
             for x in range(-reach, reach + 1):
                 transform[x + reach, y + reach] = (x, -y)
 
-
+        # Generate Vertices for the graph
+        path_matrix = create_spiral_matrix(waypoint_width)
 
         # Iterate through transfrom and create waypoints where:
         # Longitude = home_long + x * waypoint_width
         # Latitude = home_lat + y * waypoint_width
-        for y in range(-reach, reach + 1):
-            for x in range(-reach, reach + 1):
-                # Calculate the GPS coordinates of the waypoint
-                # Longitude = home_long + x * waypoint_width
-                # Latitude = home_lat + y * waypoint_width
-                # Create waypoint at the calculated GPS coordinates
-                # Add waypoint to the mission plan
-                self.add_waypoint(Waypoint(0, 0, LocationGlobal(home_lat + y * waypoint_width, home_long + x * waypoint_width, TargetAltitude)))
-
-
-
-        # calculate starting point for the mission
-        start = LocationGlobal(home_lat, home_long, TargetAltitude)
-        # calculate ending point for the mission
-        end = LocationGlobal(home_lat, home_long, TargetAltitude)
+        # Iterate through numpy matrix 
+        for elem in transform.flatten():
+            # Get x and y coordinates
+            waypoint = transform_coordinate(home_lat, home_long, TargetAltitude, math.sqrt(waypoint_width), elem)
+            # Add waypoint to mission plan, and connect to next waypoint as defined in path_matrix
+            self.add_waypoint(waypoint)
+            
+            
+            
+            
+            
+            # self.add_waypoint(Waypoint(0, 0, waypoint))
+        
+        
 
 # Function that returns new GPS coordinates when adding some meters to longitude and latitude
 def new_gps_coords(lat, lon, dNorth, dEast):
@@ -245,6 +245,76 @@ def get_weighted_path(wg, wp):
         path.append(waypoint.point)
     print(path)
     return path
+
+def haversine(long1, lat1, long2, lat2):
+    """
+    Calculate the great circle distance between two points
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians
+    long1, lat1, long2, lat2 = map(math.radians, [long1, lat1, long2, lat2])
+
+    # haversine formula
+    dlon = long2 - long1
+    dlat = lat2 - lat1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    r = 6371 # Radius of earth in kilometers. Use 3956 for miles
+    # Return distance in meters
+    return c * r 
+
+def transform_coordinate(home_lat, home_long, targetAlt, unit, direction: (int, int)):
+    """
+    Transform GPS coordinates by adding some meters to longitude and latitude
+    """
+    x_scale, y_scale = direction
+
+    new_long = home_long + (x_scale * unit) / (haversine(home_long, home_lat, home_long + 1, home_lat) * 1000)
+    new_lat = home_lat + (y_scale * unit) / (haversine(home_long, home_lat, home_long, home_lat + 1) * 1000)
+    
+    return LocationGlobal(new_lat, new_long, TargetAlt)
+
+
+def create_spiral_matrix(n):
+    """
+    Create a 2D numpy array with a spiral pattern of incremental numbers.
+
+    Parameters:
+    - n: Size of the square matrix (n x n). n must be odd.
+
+    Returns:
+    - A 2D numpy array with a spiral pattern.
+    """
+    if n % 2 == 0:
+        raise ValueError("n must be odd")
+
+    matrix = np.zeros((n, n), dtype=int)
+
+    mid = n // 2
+    current_value = 0
+
+    for layer in range(mid + 1):
+        # Top row
+        for i in range(mid - layer, mid + layer + 1):
+            matrix[mid - layer, i] = current_value
+            current_value += 1
+
+        # Right column
+        for i in range(mid - layer + 1, mid + layer + 1):
+            matrix[i, mid + layer] = current_value
+            current_value += 1
+
+        # Bottom row
+        for i in range(mid + layer - 1, mid - layer, -1):
+            matrix[mid + layer, i] = current_value
+            current_value += 1
+
+        # Left column
+        for i in range(mid + layer , mid - layer, -1):
+            matrix[i, mid - layer] = current_value
+            current_value += 1
+
+    return matrix
 
 
 if __name__ == "__main__":
