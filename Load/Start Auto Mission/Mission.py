@@ -122,19 +122,19 @@ class Mission:
         # calculate area covered by camera at given altitude, assuming camera is facing directly down
 
         # Calculate area of 0 altitude image captured by camera at given altitude in square meters using camera FOV in degrees and altitude in meters
-        camera_area = (math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)**2
+        camera_area = ((math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)*2)**2
 
         # width of the grid area to be covered by the camera in meters
-        H = math.sqrt(Area)
+        L = math.sqrt(Area)
         # How many waypoints to cover this width 
-        waypoint_width = int(H / camera_area) + 1
+        waypoint_width = int(L / math.sqrt(camera_area)) + 1
         # Make sure waypoint_width is odd, so center home location is in the middle of the grid
         if waypoint_width % 2 == 0:
             waypoint_width += 1
         
         # Furthest distance from the origin
-        reach = H // 2 
-        if reach > MAX_RANGE:
+        reach = L // 2 
+        if reach > MAX_RANGE: # Change max range units of camera area
             reach = MAX_RANGE
         reach = int(reach)
 
