@@ -119,10 +119,13 @@ class Mission:
         # Allow for all area to be covered by the camera at a given altitude. 
         # We will use a 160 degree camera FOV and 30 meters altitude to cover 160 square meters of area
 
+
         # calculate area covered by camera at given altitude, assuming camera is facing directly down
 
         # Calculate area of 0 altitude image captured by camera at given altitude in square meters using camera FOV in degrees and altitude in meters
         camera_area = ((math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)*2)**2
+
+        MAX_RANGE = MAX_RANGE / math.sqrt(camera_area)
 
         # width of the grid area to be covered by the camera in meters
         L = math.sqrt(Area)
