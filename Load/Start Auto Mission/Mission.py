@@ -9,7 +9,7 @@ two waypoints of mission plan represented as Weighted Graph
 from dataclasses import dataclass
 from functools import lru_cache
 from heapq import heappush, heappop
-from dronekit import LocationGlobal
+from dronekit import LocationGlobal    
 import math
 import numpy as np
 
@@ -32,11 +32,11 @@ class Waypoint:
 
 
 class Mission:
-    def __init__(self, states=STATES):
+    def __init__(self, home: LocationGlobal, TargetAltitude: int, Area: int, Cam_FOV: int,  MAX_RANGE: int, states=[]):
         self._states = states
-        self._waypoints = [[] for _ in states]
+        self._waypoints = [[]]
         # Create default survey mission at 30 meters covering 160 meters
-        self.build_mission()
+        self.build_mission(home.lat, home.lon, TargetAltitude, Area, Cam_FOV, MAX_RANGE)
 
     @property
     def state_count(self):
@@ -113,13 +113,11 @@ class Mission:
                     pq.push(DijkstraNode(we.v, we.weight + dist_u))
         return distances, path_dict
 
-    def build_mission(self, home_lat: int = 120.1, home_long: int = 35.5, TargetAltitude: int =20, Area: int =16000, Cam_FOV: int =160, MAX_RANGE=250):
+    def build_mission(self, home_lat: float, home_long: float, TargetAltitude: int, Area: int, Cam_FOV: int, MAX_RANGE: int):
         # We need to build a Mission with least waypoints holding GPS coordinates for each waypoint. 
         # Starting at home location, build LocationGlobal waypoints for each state in the mission plan
         # Allow for all area to be covered by the camera at a given altitude. 
         # We will use a 160 degree camera FOV and 30 meters altitude to cover 160 square meters of area
-
-
         # calculate area covered by camera at given altitude, assuming camera is facing directly down
 
         # Calculate area of 0 altitude image captured by camera at given altitude in square meters using camera FOV in degrees and altitude in meters
