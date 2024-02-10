@@ -204,6 +204,8 @@ class Mission:
             for x in range(-reach, reach + 1):
                 transform[x + reach, y + reach] = (x, -y)
 
+        print(transform)
+
         # Generate edges for the graph
         path_matrix, indices = create_spiral_matrix((reach * 2) + 1)
 
@@ -372,9 +374,6 @@ def create_spiral_matrix(n):
 
 if __name__ == "__main__":
     mission = Mission(LocationGlobal(37.773972, -122.431297, 30), 30, 160, 160, 1000)
-    #print(mission.waypoint_count)
-    #print(mission.edge_count)
-    #mission.display_mission()
 
     # Traverse the mission plan from start to finish
     mission.traverse_along_path()
