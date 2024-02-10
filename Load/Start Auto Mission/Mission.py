@@ -9,20 +9,53 @@ two waypoints of mission plan represented as Weighted Graph
 from dataclasses import dataclass
 from functools import lru_cache
 from heapq import heappush, heappop
-from dronekit import LocationGlobal    
+# from dronekit import LocationGlobal    
 import math
 import numpy as np
 
+class LocationGlobal(object):
+    """
+    A global location object.
+
+    The latitude and longitude are relative to the `WGS84 coordinate system <http://en.wikipedia.org/wiki/World_Geodetic_System>`_.
+    The altitude is relative to mean sea-level (MSL).
+
+    For example, a global location object with altitude 30 metres above sea level might be defined as:
+
+    :param lat: Latitude.
+    :param lon: Longitude.
+    :param alt: Altitude in meters relative to mean sea-level (MSL).
+    """
+
+    def __init__(self, lat, lon, alt=None):
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
+
+        # This is for backward compatibility.
+        self.local_frame = None
+        self.global_frame = None
+
+    def __str__(self):
+        return "LocationGlobal:lat=%s,lon=%s,alt=%s" % (self.lat, self.lon, self.alt)
 
 @dataclass
 class Waypoint:
+    point: LocationGlobal
+    index: int
+    def __str__(self) -> str:
+        return f"{self.point.lat} {self.point.lon} {self.point.alt}, {self.index}"
+
+
+@dataclass
+class Edge:
     u: int # index of starting state
     v: int # index of ending state
-    point: LocationGlobal # GPS coordinates of the waypoint
+    # point: LocationGlobal # GPS coordinates of the waypoint
     weight: int = 1 # Unit time to travel from u to v in seconds 
 
     def reversed(self):
-        return Waypoint(self.v, self.u, self.weight)
+        return Edge(self.v, self.u, self.weight)
 
     def __lt__(self, other) -> bool:
         return self.weight < other.weight
@@ -33,60 +66,60 @@ class Waypoint:
 
 class Mission:
     def __init__(self, home: LocationGlobal, TargetAltitude: int, Area: int, Cam_FOV: int,  MAX_RANGE: int, states=[]):
-        self._states = states
-        self._waypoints = [[]]
+        self._waypoints = states
+        self._edges = [[]]
         # Create default survey mission at 30 meters covering 160 meters
         self.build_mission(home.lat, home.lon, TargetAltitude, Area, Cam_FOV, MAX_RANGE)
 
     @property
-    def state_count(self):
-        return len(self._states)
+    def waypoint_count(self):
+        return len(self._waypoints)
 
     @property
-    def waypoint_count(self):
-        return sum(map(len, self._waypoints))
+    def edge_count(self):
+        return sum(map(len, self._edges))
 
-    def index_of(self, state) -> int:
-        return self._states.index(state)
+    def index_of(self, waypoint) -> int:
+        return self._waypoints.index(waypoint)
 
-    def add_waypoint(self, waypoint):
-        self._waypoints[waypoint.u].append(waypoint)
+    def add_edge(self, edge: Edge):
+        self._edges[edge.u].append(edge)
 
     def state_at(self, index: int):
-        return self._states[index]
-
-    def add_state(self, state):
-        self._states.append(state)
-        self._waypoint.append([])
-        return self.state_count - 1
-
-    def add_waypoint_by_indices(self, u, v, tms):
-        waypoint = Waypoint(u, v, tms)
-        self.add_waypoint(waypoint)
-
-    def add_waypoint_by_vertices(self, first, second, tms):
-        u = self._states.index(first)
-        v = self._states.index(second)
-        self.add_waypoint_by_indices(u, v, tms)
-
-    def waypoints_for_index(self, index: int):
         return self._waypoints[index]
+
+    def add_waypoint(self, state):
+        self._waypoints.append(state)
+        self._edges.append([])
+        return self.waypoint_count - 1
+
+    def add_edge_by_indices(self, u, v, weight=1):
+        edge = Edge(u, v, weight)
+        self.add_edge(edge)
+
+    def add_edge_by_vertices(self, first, second):
+        u = self._waypoints.index(first)
+        v = self._waypoints.index(second)
+        self.add_edge_by_indices(u, v)
+
+    def edges_for_index(self, index: int):
+        return self._edges[index]
 
     def neighbors_for_index_with_weights(self, index):
         distance_tuples = []
-        for waypoint in self.waypoints_for_index(index):
-            distance_tuples.append((self.state_at(waypoint.v), waypoint.TMS))
+        for edge in self.edges_for_index(index):
+            distance_tuples.append((self.state_at(edge.v)))
         return distance_tuples
 
     def __str__(self):
         desc: str = ''
-        for i in range(self.state_count):
-            desc += f"{self.state_at(i)} -> {self.neighbors_for_index_with_weights(i)} \n"
+        for i in range(self.waypoint_count):
+            desc += f"{self.waypoint_count(i)} -> {self.neighbors_for_index_with_weights(i)} \n"
         return desc
 
     @lru_cache(maxsize=None)
     def get_min_path(self, start, end):
-        assert start in self._states and end in self._states
+        assert start in self._waypoints and end in self._waypoints
         distances, path_dict = self.dijkstra(start)
         path = path_dict_to_path(self.index_of(start),
                                  self.index_of(end), path_dict)
@@ -96,7 +129,7 @@ class Mission:
         # Find starting index
         first: int = self.index_of(root)
         # Distances are unknown first
-        distances = [None] * self.state_count
+        distances = [None] * self.waypoint_count
         # Root is 0 away from root
         distances[first] = 0
         path_dict = {}
@@ -105,13 +138,24 @@ class Mission:
         while not pq.empty:
             u: int = pq.pop().state
             dist_u = distances[u]
-            for we in self.wayypoints_for_index(u):
+            for we in self.edges_for_index(u):
                 dist_v = distances[we.v]
                 if dist_v is None or dist_v > we.weight + dist_u:
                     distances[we.v] = we.weight + dist_u
                     path_dict[we.v] = we
                     pq.push(DijkstraNode(we.v, we.weight + dist_u))
         return distances, path_dict
+
+    # Start at first waypoint and traverse along the path, printing out the neighbors
+    def traverse_along_path(self):
+        for i in range(self.waypoint_count):
+            # yield self.state_at(i)
+            # yield self.state_at(i)
+            print(f"{self.state_at(i)} -> {self.neighbors_for_index_with_weights(i)}")
+
+    def display_mission(self):
+        for i in range(self.waypoint_count):
+            print(f"{self.state_at(i)} -> {self.neighbors_for_index_with_weights(i)}")
 
     def build_mission(self, home_lat: float, home_long: float, TargetAltitude: int, Area: int, Cam_FOV: int, MAX_RANGE: int):
         # We need to build a Mission with least waypoints holding GPS coordinates for each waypoint. 
@@ -120,7 +164,8 @@ class Mission:
         # We will use a 160 degree camera FOV and 30 meters altitude to cover 160 square meters of area
         # calculate area covered by camera at given altitude, assuming camera is facing directly down
 
-        # Calculate area of 0 altitude image captured by camera at given altitude in square meters using camera FOV in degrees and altitude in meters
+        # Calculate area of 0 altitude image captured by camera at given altitude
+        # in square meters using camera FOV in degrees and altitude in meters
         camera_area = ((math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)*2)**2
 
         MAX_RANGE = MAX_RANGE / math.sqrt(camera_area)
@@ -141,13 +186,9 @@ class Mission:
 
         start = LocationGlobal(home_lat, home_long, TargetAltitude)
         # Create np Grid matrix of waypoints
-        # Create waypoint_witdth x waypoint_width grid of waypoints. Home coordinates will be in the middle of the grid. (0, 0)
-        # Expand grid from center in all four quadrants. 
-        # If Reach = 1: Matrix looks like
-        #    (-1, 1), (0, 1), (1, 1)
-        #    (-1, 0), (0, 0), (1, 0)
-        #    (-1, -1), (0, -1), (1, -1)
-
+        # Create waypoint_witdth x waypoint_width grid of waypoints.
+        # Home coordinates will be in the middle of the grid. (0, 0)
+        # Expand grid from center in all four quadrants.
         # If Reach = 2: Matrix looks like:
         #   (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2)
         #   (-2, 1), (-1, 1), (0, 1), (1, 1), (2, 1)
@@ -163,26 +204,31 @@ class Mission:
             for x in range(-reach, reach + 1):
                 transform[x + reach, y + reach] = (x, -y)
 
-        # Generate Vertices for the graph
-        path_matrix = create_spiral_matrix(waypoint_width)
+        # Generate edges for the graph
+        path_matrix, indices = create_spiral_matrix((reach * 2) + 1)
 
-        # Iterate through transfrom and create waypoints where:
-        # Longitude = home_long + x * waypoint_width
-        # Latitude = home_lat + y * waypoint_width
-        # Iterate through numpy matrix 
-        for elem in transform.flatten():
+        # Now build mission plan waypoints and assign edges in order of path_matrix indices
+        # Add home location as first waypoint
+        home = Waypoint(start, 0)
+        self.add_waypoint(home)
+        # Since we are starting at home, we can pop first index from indices
+        indices = indices[1:]
+        previous = 0
+        for index in indices:
             # Get x and y coordinates
-            waypoint = transform_coordinate(home_lat, home_long, TargetAltitude, math.sqrt(waypoint_width), elem)
+            point = transform_coordinate(home_lat, home_long, TargetAltitude, math.sqrt(waypoint_width), transform.flatten()[index])
+            # print(point)
+            # Create waypoint object
+            waypoint = Waypoint(point, previous + 1)
             # Add waypoint to mission plan, and connect to next waypoint as defined in path_matrix
             self.add_waypoint(waypoint)
-            
-            
-            
-            
-            
-            # self.add_waypoint(Waypoint(0, 0, waypoint))
-        
-        
+            # Add edges to the graph, connecting waypoints based on path_matrix,  and distance between waypoints
+            # print(self._waypoints)
+            self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[previous + 1])
+            previous += 1
+
+        # assign last waypoint to home
+        self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[0])
 
 # Function that returns new GPS coordinates when adding some meters to longitude and latitude
 def new_gps_coords(lat, lon, dNorth, dEast):
@@ -273,7 +319,7 @@ def transform_coordinate(home_lat, home_long, targetAlt, unit, direction: (int, 
     new_long = home_long + (x_scale * unit) / (haversine(home_long, home_lat, home_long + 1, home_lat) * 1000)
     new_lat = home_lat + (y_scale * unit) / (haversine(home_long, home_lat, home_long, home_lat + 1) * 1000)
     
-    return LocationGlobal(new_lat, new_long, TargetAlt)
+    return LocationGlobal(new_lat, new_long, targetAlt)
 
 
 def create_spiral_matrix(n):
@@ -315,9 +361,20 @@ def create_spiral_matrix(n):
             matrix[i, mid - layer] = current_value
             current_value += 1
 
-    return matrix
+    # Get list of indices that are arranged in increasing order of the elements in the matrix
+    indices = np.argsort(matrix.flatten())
+
+
+    #print(indices)
+
+    return matrix, indices
 
 
 if __name__ == "__main__":
-    TAP_FSM = TAPfsm()
-    TAP_FSM.get_min_path("Test-Logic-Reset", "Update-IR")
+    mission = Mission(LocationGlobal(37.773972, -122.431297, 30), 30, 160, 160, 1000)
+    #print(mission.waypoint_count)
+    #print(mission.edge_count)
+    #mission.display_mission()
+
+    # Traverse the mission plan from start to finish
+    mission.traverse_along_path()
