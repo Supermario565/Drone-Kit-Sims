@@ -1,5 +1,5 @@
 """
-Mission Plan Graph for Guided UAV Navigation
+MissMission Plan Graph for Guided UAV Navigation
 Author: Dmitri Lyalikov
 
 Uses Djikstra Algorithm to find shortest path between
@@ -11,7 +11,9 @@ from functools import lru_cache
 from heapq import heappush, heappop
 # from dronekit import LocationGlobal    
 import math
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 class LocationGlobal(object):
     """
@@ -157,6 +159,34 @@ class Mission:
         for i in range(self.waypoint_count):
             print(f"{self.state_at(i)} -> {self.neighbors_for_index_with_weights(i)}")
 
+    # save gps coordinates to a csv file
+    def save_mission_to_csv(self, filename: str):
+        df = pd.DataFrame(columns=["Latitude", "Longitude", "Altitude"])
+        for i in range(self.waypoint_count):
+            df = df._append({"Latitude": self.state_at(i).point.lat, "Longitude": self.state_at(i).point.lon, "Altitude": self.state_at(i).point.alt}, ignore_index=True)
+        df.to_csv(filename, index=False)
+
+    # Display mission waypoints (longitude and latitude) and edges on plot
+    def display_mission_on_plot(self):
+        index = 0
+        for i in range(self.waypoint_count):
+            plt.plot(self.state_at(i).point.lon, self.state_at(i).point.lat, 'bo')
+            print(f"{self.state_at(i).point.lon} {self.state_at(i).point.lat}")
+            for edge in self.edges_for_index(i):
+                # label each point with index
+                # get index of the next waypoint
+                # index = self.index_of(self.state_at(edge.v)) - 1
+                #plt.text(self.state_at(i).point.lon, self.state_at(i).point.lat, f'{index}', fontsize=12, fontweight='bold', ha='right')
+
+                # plot waypoint and edge (directed arrow) as directed graph from i to edge.v. Edges are arrows pointing to the next waypoint
+                plt.plot([self.state_at(i).point.lon, self.state_at(edge.v).point.lon], [self.state_at(i).point.lat, self.state_at(edge.v).point.lat], 'r-')
+            index += 1
+        # Add title including self.physical_length and self.physical_area, waypoint number, and home location
+        plt.title(f"Mission: {self.physical_length}m, {self.physical_area}m^2, {self.waypoint_count} waypoints\n Home: {self.state_at(0).point.lat}, {self.state_at(0).point.lon}", fontsize=8, fontweight='bold')
+        plt.show()
+
+    #plt.plot([self.state_at(i).point.lon, self.state_at(edge.v).point.lon],
+     #        [self.state_at(i).point.lat, self.state_at(edge.v).point.lat], 'r-')
     def build_mission(self, home_lat: float, home_long: float, TargetAltitude: int, Area: int, Cam_FOV: int, MAX_RANGE: int):
         # We need to build a Mission with least waypoints holding GPS coordinates for each waypoint. 
         # Starting at home location, build LocationGlobal waypoints for each state in the mission plan
@@ -167,7 +197,7 @@ class Mission:
         # Calculate area of 0 altitude image captured by camera at given altitude
         # in square meters using camera FOV in degrees and altitude in meters
         camera_area = ((math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)*2)**2
-
+        print(camera_area)
         MAX_RANGE = MAX_RANGE / math.sqrt(camera_area)
 
         # width of the grid area to be covered by the camera in meters
@@ -179,7 +209,8 @@ class Mission:
             waypoint_width += 1
         
         # Furthest distance from the origin
-        reach = L // 2 
+        reach = L // 2
+        print(reach)
         if reach > MAX_RANGE: # Change max range units of camera area
             reach = MAX_RANGE
         reach = int(reach)
@@ -205,6 +236,8 @@ class Mission:
                 transform[x + reach, y + reach] = (x, -y)
 
         print(transform)
+        self.physical_length = ((reach * 2 + 1) *  math.sqrt(camera_area))
+        self.physical_area = self.physical_length ** 2
 
         # Generate edges for the graph
         path_matrix, indices = create_spiral_matrix((reach * 2) + 1)
@@ -213,6 +246,7 @@ class Mission:
         # Add home location as first waypoint
         home = Waypoint(start, 0)
         self.add_waypoint(home)
+        self.distance = 0
         # Since we are starting at home, we can pop first index from indices
         indices = indices[1:]
         previous = 0
@@ -227,10 +261,17 @@ class Mission:
             # Add edges to the graph, connecting waypoints based on path_matrix,  and distance between waypoints
             # print(self._waypoints)
             self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[previous + 1])
+            self.distance += get_distance_metres(self._waypoints[previous].point, self._waypoints[previous + 1].point)
             previous += 1
 
         # assign last waypoint to home
         self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[0])
+        print(self.distance)
+        # if UAV traveling at 3 m/s calculate time to complete mission
+        self.time = self.distance / 3
+        print(self.time)
+
+
 
 # Function that returns new GPS coordinates when adding some meters to longitude and latitude
 def new_gps_coords(lat, lon, dNorth, dEast):
@@ -243,6 +284,14 @@ def new_gps_coords(lat, lon, dNorth, dEast):
     newlat = lat + dLat * 180/math.pi
     newlon = lon + dLon * 180/math.pi
     return LocationGlobal(newlat, newlon, 0)
+
+
+
+# Get meters between two GPS coordinates
+def get_distance_metres(aLocation1, aLocation2):
+    dlat = aLocation2.lat - aLocation1.lat
+    dlong = aLocation2.lon - aLocation1.lon
+    return math.sqrt((dlat*dlat) + (dlong*dlong)) * 1.113195e5
 
 
 @dataclass
@@ -373,7 +422,11 @@ def create_spiral_matrix(n):
 
 
 if __name__ == "__main__":
-    mission = Mission(LocationGlobal(37.773972, -122.431297, 30), 30, 160, 160, 1000)
+
+    mission = Mission(LocationGlobal(40.919681, -73.352823, 30), 50, 1250, 160, 100000)
 
     # Traverse the mission plan from start to finish
-    mission.traverse_along_path()
+    # mission.get_min_path(mission.state_at(0), mission.state_at())
+    mission.display_mission_on_plot()
+    mission.save_mission_to_csv("points.csv")
+    # mission.traverse_along_path()
