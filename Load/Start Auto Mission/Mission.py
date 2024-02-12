@@ -242,7 +242,7 @@ class Mission:
             for x in range(-reach, reach + 1):
                 transform[x + reach, y + reach] = (x, -y)
 
-        self.physical_length = ((reach * 2 + 1) * math.sqrt(camera_area))
+        # self.physical_length = ((reach * 2 + 1) * math.sqrt(camera_area))
         print(reach * 2 + 1)
         print(math.sqrt(camera_area))
         self.physical_area = self.physical_length ** 2
@@ -270,7 +270,11 @@ class Mission:
             self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[previous + 1])
             self.distance += haversine_distance(self._waypoints[previous].point, self._waypoints[previous + 1].point)
             previous += 1
-
+        # physical length is column 0 point 0 to last column last point distance
+        self.physical_length = haversine_distance(self._waypoints[0].point, self._waypoints[-1].point)
+        self.physical_area = self.physical_length ** 2
+        print(f'physical length: {self.physical_length}')
+        print(f'physical area: {self.physical_area}')
         print(f"distance: {self.distance}")
         # assign last waypoint to home
         self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[0])
@@ -450,6 +454,6 @@ if __name__ == "__main__":
                       TargetAltitude=30,
                       Area=150*150,
                       Cam_FOV=130,
-                      MAX_RANGE=300)
+                      MAX_RANGE=150*150)
     mission.display_mission_on_plot()
     mission.save_mission_to_csv("points.csv")
