@@ -1,5 +1,5 @@
 """
-MissMission Plan Graph for Guided UAV Navigation
+Mission Plan Graph for Guided UAV Navigation
 Author: Dmitri Lyalikov
 
 Uses Djikstra Algorithm to find shortest path between
@@ -14,6 +14,7 @@ import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
 
 class LocationGlobal(object):
     """
@@ -41,20 +42,21 @@ class LocationGlobal(object):
     def __str__(self):
         return "LocationGlobal:lat=%s,lon=%s,alt=%s" % (self.lat, self.lon, self.alt)
 
+
 @dataclass
 class Waypoint:
     point: LocationGlobal
     index: int
+
     def __str__(self) -> str:
         return f"{self.point.lat} {self.point.lon} {self.point.alt}, {self.index}"
 
 
 @dataclass
 class Edge:
-    u: int # index of starting state
-    v: int # index of ending state
-    # point: LocationGlobal # GPS coordinates of the waypoint
-    weight: int = 1 # Unit time to travel from u to v in seconds 
+    u: int  # index of starting state
+    v: int  # index of ending state
+    weight: int = 1  # Unit time to travel from u to v in seconds
 
     def reversed(self):
         return Edge(self.v, self.u, self.weight)
@@ -70,8 +72,17 @@ class Mission:
     def __init__(self, home: LocationGlobal, TargetAltitude: int, Area: int, Cam_FOV: int,  MAX_RANGE: int, states=[]):
         self._waypoints = states
         self._edges = [[]]
+        self.distance = 0
+        self.physical_length = 0
+        self.physical_area = 0
+        self.mission_time = 0
         # Create default survey mission at 30 meters covering 160 meters
         self.build_mission(home.lat, home.lon, TargetAltitude, Area, Cam_FOV, MAX_RANGE)
+        print(f"Mission Plan Created...")
+        print(f"Mission Length: {self.physical_length}m")
+        print(f"Mission Area: {self.physical_area}m^2")
+        print(f"Mission Time: {self.mission_time} minutes")
+
 
     @property
     def waypoint_count(self):
@@ -171,22 +182,17 @@ class Mission:
         index = 0
         for i in range(self.waypoint_count):
             plt.plot(self.state_at(i).point.lon, self.state_at(i).point.lat, 'bo')
-            print(f"{self.state_at(i).point.lon} {self.state_at(i).point.lat}")
+            # print(f"{self.state_at(i).point.lon} {self.state_at(i).point.lat}")
             for edge in self.edges_for_index(i):
                 # label each point with index
                 # get index of the next waypoint
-                # index = self.index_of(self.state_at(edge.v)) - 1
-                #plt.text(self.state_at(i).point.lon, self.state_at(i).point.lat, f'{index}', fontsize=12, fontweight='bold', ha='right')
-
-                # plot waypoint and edge (directed arrow) as directed graph from i to edge.v. Edges are arrows pointing to the next waypoint
+                plt.text(self.state_at(i).point.lon, self.state_at(i).point.lat, f'{index}', fontsize=12, fontweight='bold', ha='right')
                 plt.plot([self.state_at(i).point.lon, self.state_at(edge.v).point.lon], [self.state_at(i).point.lat, self.state_at(edge.v).point.lat], 'r-')
             index += 1
         # Add title including self.physical_length and self.physical_area, waypoint number, and home location
         plt.title(f"Mission: {self.physical_length}m, {self.physical_area}m^2, {self.waypoint_count} waypoints\n Home: {self.state_at(0).point.lat}, {self.state_at(0).point.lon}", fontsize=8, fontweight='bold')
         plt.show()
 
-    #plt.plot([self.state_at(i).point.lon, self.state_at(edge.v).point.lon],
-     #        [self.state_at(i).point.lat, self.state_at(edge.v).point.lat], 'r-')
     def build_mission(self, home_lat: float, home_long: float, TargetAltitude: int, Area: int, Cam_FOV: int, MAX_RANGE: int):
         # We need to build a Mission with least waypoints holding GPS coordinates for each waypoint. 
         # Starting at home location, build LocationGlobal waypoints for each state in the mission plan
@@ -197,21 +203,22 @@ class Mission:
         # Calculate area of 0 altitude image captured by camera at given altitude
         # in square meters using camera FOV in degrees and altitude in meters
         camera_area = ((math.tan(math.radians(Cam_FOV/2)) * TargetAltitude)*2)**2
-        print(camera_area)
+
         MAX_RANGE = MAX_RANGE / math.sqrt(camera_area)
 
         # width of the grid area to be covered by the camera in meters
         L = math.sqrt(Area)
         # How many waypoints to cover this width 
         waypoint_width = int(L / math.sqrt(camera_area)) + 1
+        print(Area)
+        print(L)
         # Make sure waypoint_width is odd, so center home location is in the middle of the grid
         if waypoint_width % 2 == 0:
             waypoint_width += 1
         
         # Furthest distance from the origin
         reach = L // 2
-        print(reach)
-        if reach > MAX_RANGE: # Change max range units of camera area
+        if reach > MAX_RANGE:  # Change max range units of camera area
             reach = MAX_RANGE
         reach = int(reach)
 
@@ -235,8 +242,9 @@ class Mission:
             for x in range(-reach, reach + 1):
                 transform[x + reach, y + reach] = (x, -y)
 
-        print(transform)
-        self.physical_length = ((reach * 2 + 1) *  math.sqrt(camera_area))
+        self.physical_length = ((reach * 2 + 1) * math.sqrt(camera_area))
+        print(reach * 2 + 1)
+        print(math.sqrt(camera_area))
         self.physical_area = self.physical_length ** 2
 
         # Generate edges for the graph
@@ -246,7 +254,6 @@ class Mission:
         # Add home location as first waypoint
         home = Waypoint(start, 0)
         self.add_waypoint(home)
-        self.distance = 0
         # Since we are starting at home, we can pop first index from indices
         indices = indices[1:]
         previous = 0
@@ -261,15 +268,14 @@ class Mission:
             # Add edges to the graph, connecting waypoints based on path_matrix,  and distance between waypoints
             # print(self._waypoints)
             self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[previous + 1])
-            self.distance += get_distance_metres(self._waypoints[previous].point, self._waypoints[previous + 1].point)
+            self.distance += haversine_distance(self._waypoints[previous].point, self._waypoints[previous + 1].point)
             previous += 1
 
+        print(f"distance: {self.distance}")
         # assign last waypoint to home
         self.add_edge_by_vertices(self._waypoints[previous], self._waypoints[0])
-        print(self.distance)
-        # if UAV traveling at 3 m/s calculate time to complete mission
-        self.time = self.distance / 3
-        print(self.time)
+        # if UAV traveling at 3 m/s calculate time to complete mission, find time to travel entire distance in minutes
+        self.mission_time = self.distance / 3 / 60
 
 
 
@@ -286,12 +292,30 @@ def new_gps_coords(lat, lon, dNorth, dEast):
     return LocationGlobal(newlat, newlon, 0)
 
 
+# Get distance in meters between two GPS coordinates
+def haversine_distance(aLocation1, aLocation2):
+    # Radius of the Earth in meters
+    lat1 = aLocation1.lat
+    lon1 = aLocation1.lon
+    lat2 = aLocation2.lat
+    lon2 = aLocation2.lon
+    R = 6371000.0
 
-# Get meters between two GPS coordinates
-def get_distance_metres(aLocation1, aLocation2):
-    dlat = aLocation2.lat - aLocation1.lat
-    dlong = aLocation2.lon - aLocation1.lon
-    return math.sqrt((dlat*dlat) + (dlong*dlong)) * 1.113195e5
+    # Convert latitude and longitude from degrees to radians
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+
+    # Calculate differences in coordinates
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    # Haversine formula
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    # Distance in meters
+    distance = R * c * 1000
+
+    return distance
 
 
 @dataclass
@@ -344,6 +368,7 @@ def get_weighted_path(wg, wp):
     print(path)
     return path
 
+
 def haversine(long1, lat1, long2, lat2):
     """
     Calculate the great circle distance between two points
@@ -357,9 +382,10 @@ def haversine(long1, lat1, long2, lat2):
     dlat = lat2 - lat1
     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
     c = 2 * math.asin(math.sqrt(a))
-    r = 6371 # Radius of earth in kilometers. Use 3956 for miles
+    r = 6371  # Radius of earth in kilometers. Use 3956 for miles
     # Return distance in meters
-    return c * r 
+    return c * r * 1000
+
 
 def transform_coordinate(home_lat, home_long, targetAlt, unit, direction: (int, int)):
     """
@@ -415,18 +441,15 @@ def create_spiral_matrix(n):
     # Get list of indices that are arranged in increasing order of the elements in the matrix
     indices = np.argsort(matrix.flatten())
 
-
-    #print(indices)
-
     return matrix, indices
 
 
 if __name__ == "__main__":
-
-    mission = Mission(LocationGlobal(40.919681, -73.352823, 30), 50, 1250, 160, 100000)
-
-    # Traverse the mission plan from start to finish
-    # mission.get_min_path(mission.state_at(0), mission.state_at())
+    # home_location, target_altitude, area, camera_fov, max_range
+    mission = Mission(home=LocationGlobal(40.919681, -73.352823, 30),
+                      TargetAltitude=30,
+                      Area=150*150,
+                      Cam_FOV=130,
+                      MAX_RANGE=300)
     mission.display_mission_on_plot()
     mission.save_mission_to_csv("points.csv")
-    # mission.traverse_along_path()
