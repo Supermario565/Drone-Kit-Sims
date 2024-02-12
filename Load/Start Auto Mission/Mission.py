@@ -452,8 +452,8 @@ if __name__ == "__main__":
     # home_location, target_altitude, area, camera_fov, max_range
     mission = Mission(home=LocationGlobal(40.919681, -73.352823, 30),
                       TargetAltitude=30,
-                      Area=150*150,
-                      Cam_FOV=130,
+                      Area=10*100,
+                      Cam_FOV=160,
                       MAX_RANGE=150*150)
     mission.display_mission_on_plot()
     mission.save_mission_to_csv("points.csv")
