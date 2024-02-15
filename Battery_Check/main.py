@@ -93,7 +93,7 @@ point1 = LocationGlobalRelative(47.397742, 8.545594, 10)
 vehicle.simple_goto(point1)
 
 # sleep so we can see the change in map
-time.sleep()
+time.sleep(1100)
 
 class battery_check:
 
