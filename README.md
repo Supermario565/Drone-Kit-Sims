@@ -1,5 +1,6 @@
 # Drone-Kit-Sims
 Collection of our Drone-Kit Simulations for Experimentation
+Mario wrote something here
 
 Based on UAV-MOBFinder Project, we need to simulate the following processes individually, then integrate them as a project:
 * [X] Connect and wait for Arming
